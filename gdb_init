@@ -1,0 +1,10 @@
+set history save on
+set confirm off
+set remotetimeout 240
+target extended-remote 192.168.55.10:3333
+set print asm-demangle on
+monitor reset halt
+load bootloader
+file bootloader
+display/i $pc
+set $pc=0x1004

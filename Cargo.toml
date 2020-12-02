@@ -1,0 +1,18 @@
+[package]
+name = "riscv-rtos"
+version = "0.1.0"
+authors = ["Carl Hurd <carl@basilisklabs.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["panic-halt"]
+bsp_hifive = ["hifive1", "riscv", "riscv-rt", "panic-halt"]
+bsp_maix_m1w = ["k210-hal", "riscv", "riscv-rt", "panic-halt"]
+
+[dependencies]
+hifive1 = {version = "0.9.0", features = ["board-hifive1-revb"], optional = true}
+k210-hal = {path = "../k210-hal", optional = true}
+riscv = {version = "0.6.0", optional = true}
+riscv-rt = {version = "0.8.0", optional = true}
+panic-halt = {version = "0.2.0", optional = true}
