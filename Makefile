@@ -50,7 +50,7 @@ OBJCOPY_CMD = cargo objcopy \
 
 .PHONY: all clippy clean objcopy nm expand server_hifive program_hifive program_maix
 
-all: clean $(CARGO_OUTPUT)
+all: $(CARGO_OUTPUT)
 
 $(CARGO_OUTPUT): $(SOURCES)
 	$(BUILD_CMD)

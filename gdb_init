@@ -7,4 +7,6 @@ monitor reset halt
 load bootloader
 file bootloader
 display/i $pc
+monitor reset
 set $pc=0x1004
+monitor reset

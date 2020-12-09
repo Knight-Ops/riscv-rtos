@@ -1,4 +1,3 @@
-
 /// Timekeeping interfaces.
 pub mod interface {
     use core::time::Duration;
