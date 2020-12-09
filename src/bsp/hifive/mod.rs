@@ -10,8 +10,8 @@ use hifive1::hal::core::clint::Clint;
 pub mod console;
 pub mod time;
 
-use crate::println;
-use crate::sync::Spinlock;
+use crate::{println, mut_spinlock, spinlock, read_spinlock, write_spinlock};
+use crate::sync::{Spinlock, RwSpinlock};
 
 // Global Instances
 
@@ -22,11 +22,19 @@ pub static CONSOLE: Spinlock<RefCell<Option<console::SerialWrapper>>> =
 pub static CORELOCAL_INTERRUPT: Spinlock<RefCell<Option<Clint>>> = Spinlock::new(RefCell::new(None));
 // End Global Instances
 
+// pub fn get_ref<'a, T>(periph: &'a Spinlock<RefCell<Option<T>>>) -> &'a T {
+//     periph.lock().borrow().as_ref().unwrap()
+// }
+
+// pub fn get_mut_ref<'a, T>(periph: &'a Spinlock<RefCell<Option<T>>>) -> &'a mut T {
+//     periph.lock().borrow_mut().as_mut().unwrap()
+// }
+
 #[no_mangle]
 pub fn DefaultHandler() {
     use riscv::register::mcause::{Interrupt, Trap};
     let cause = riscv::register::mcause::read().cause();
-    println!("Interrupt : {:?}", cause);
+    // println!("Interrupt : {:?}", cause);
 
     match cause {
         Trap::Interrupt(int) => match int {
@@ -75,7 +83,7 @@ pub fn DefaultHandler() {
 pub fn ExceptionHandler(trap_frame: &mut riscv_rt::TrapFrame) {
     use riscv::register::mcause::{Exception, Trap};
     let cause = riscv::register::mcause::read().cause();
-    println!("Exception : {:?}", cause);
+    // println!("Exception : {:?}", cause);
 
     match cause {
         Trap::Exception(exc) => {
@@ -91,7 +99,13 @@ pub fn ExceptionHandler(trap_frame: &mut riscv_rt::TrapFrame) {
                     match mtval {
                         // rdtime a0
                         0xc0102573 => {
-                            trap_frame.a0 = 0;
+                            trap_frame.a0 = spinlock!(CORELOCAL_INTERRUPT).mtime.mtime_lo() as usize;
+                            riscv::register::mepc::write(riscv::register::mepc::read() + 4);
+                            return;
+                        },
+                        // rdtimeh a0
+                        0xc8102573 => {
+                            trap_frame.a0 = spinlock!(CORELOCAL_INTERRUPT).mtime.mtime_hi() as usize;
                             riscv::register::mepc::write(riscv::register::mepc::read() + 4);
                             return;
                         }
@@ -147,12 +161,15 @@ pub fn ExceptionHandler(trap_frame: &mut riscv_rt::TrapFrame) {
 
 pub fn init() {
     let dr = DeviceResources::take().unwrap();
-    let mut cp = dr.core_peripherals;
+    let cp = dr.core_peripherals;
     let p = dr.peripherals;
     let pins = dr.pins;
 
     // Configure clocks
     let clocks = hifive1::clock::configure(p.PRCI, p.AONCLK, 320.mhz().into());
+
+    // Populate the CLINT Peripheral behind the Mutex
+    CORELOCAL_INTERRUPT.lock().borrow_mut().replace(cp.clint);
 
     // Configure UART for stdout
     console::configure(
@@ -163,12 +180,9 @@ pub fn init() {
         clocks,
     );
 
-    CORELOCAL_INTERRUPT.lock().borrow_mut().replace(cp.clint);
-    CORELOCAL_INTERRUPT.lock().borrow_mut().as_mut().unwrap().mtimecmp.set_mtimecmp(0xA_0000);
+    // mut_spinlock!(CORELOCAL_INTERRUPT).mtimecmp.set_mtimecmp(0xA_0000);
 
-    // cp.clint.mtimecmp.set_mtimecmp(0xA_0000);
-
-    println!("BSP init @ : {}", riscv::register::time::read());
+    println!("BSP init @ : {}", riscv::register::time::read64());
     println!("BSP init @ : {}", riscv::register::mcycle::read());
     println!("BSP init @ : {}", riscv::register::minstret::read());
 }

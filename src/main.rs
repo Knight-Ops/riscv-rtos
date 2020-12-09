@@ -14,6 +14,9 @@ mod sync;
 mod time;
 
 #[macro_use]
+mod macros;
+
+#[macro_use]
 mod print;
 
 #[cfg(any(feature = "bsp_hifive", feature = "bsp_maix_m1w"))]
@@ -37,16 +40,18 @@ unsafe fn bootloader_entry() -> ! {
             .chars_written())
     );
 
-    riscv::register::mie::set_mtimer();
+    // riscv::register::mie::set_mtimer();
+    // riscv::register::mie::set_mext();
+    // riscv::register::mie::set_msoft();
     riscv::interrupt::enable();
 
     loop {
-        let instret = riscv::register::minstret::read();
+        let time = riscv::register::time::read64();
 
-        if instret % 0xA000 == 0 {
+        if time % 0x1_0000 == 0 {
             println!(
-                "Instructions Retired : {}",
-                instret
+                "Tick : {}",
+                time
             );
         }
     }
