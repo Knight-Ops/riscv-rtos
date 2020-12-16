@@ -8,12 +8,10 @@ unsafe impl RawMutex for RawSpinlock {
 
     type GuardMarker = GuardSend;
 
-    #[inline(never)]
     fn lock(&self) {
         while !self.try_lock() {}
     }
 
-    #[inline(never)]
     fn try_lock(&self) -> bool {
         if !self.0.load(Ordering::SeqCst) {
             self.0.store(true, Ordering::SeqCst);
@@ -23,7 +21,6 @@ unsafe impl RawMutex for RawSpinlock {
         }
     }
 
-    #[inline(never)]
     unsafe fn unlock(&self) {
         self.0.store(false, Ordering::SeqCst);
     }
@@ -32,14 +29,16 @@ unsafe impl RawMutex for RawSpinlock {
 pub type Spinlock<T> = lock_api::Mutex<RawSpinlock, T>;
 pub type SpinlockGuard<'a, T> = lock_api::MutexGuard<'a, RawSpinlock, T>;
 
-
 pub struct RawRwSpinlock {
-    exclusive: AtomicBool, 
-    shared: AtomicBool
+    exclusive: AtomicBool,
+    shared: AtomicBool,
 }
 
 unsafe impl RawRwLock for RawRwSpinlock {
-    const INIT: RawRwSpinlock = RawRwSpinlock {exclusive: AtomicBool::new(false), shared: AtomicBool::new(false)};
+    const INIT: RawRwSpinlock = RawRwSpinlock {
+        exclusive: AtomicBool::new(false),
+        shared: AtomicBool::new(false),
+    };
 
     type GuardMarker = GuardSend;
 

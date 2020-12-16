@@ -1,16 +1,14 @@
-use crate::bsp::critical_section;
-use crate::bsp::CONSOLE;
+use crate::BoardSupportPackage;
+use crate::target_board;
 use core::fmt;
+
+use crate::mut_spinlock;
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    use crate::console::interface::Write;
-    critical_section(|_| {
-        CONSOLE
-            .lock()
-            .borrow_mut()
-            .as_mut()
-            .unwrap()
+    use crate::traits::console::interface::Write;
+    target_board::critical_section(|_| {
+        mut_spinlock!(target_board::get_console())
             .write_fmt(args)
     });
 }
@@ -30,6 +28,6 @@ macro_rules! print {
 macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ({
-        $crate::print::_print(format_args_nl!($($arg)*));
+        $crate::macros::print::_print(format_args_nl!($($arg)*));
     })
 }

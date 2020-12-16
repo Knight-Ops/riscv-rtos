@@ -6,38 +6,47 @@
 #![no_std]
 #![no_main]
 
+mod traits;
 mod bsp;
-mod console;
-mod driver;
+// mod driver;
 mod panic;
 mod sync;
-mod time;
+mod page_allocator;
 
 #[macro_use]
 mod macros;
 
-#[macro_use]
-mod print;
+// #[macro_use]
+// mod print;
 
 #[cfg(any(feature = "bsp_hifive", feature = "bsp_maix_m1w"))]
 use riscv_rt::entry;
 
-use console::interface::All;
+use bsp::target_board as target_board;
+use traits::board::BoardSupportPackage;
+use traits::allocator::Allocator;
+use traits::console::interface::All;
 
 #[entry]
 unsafe fn bootloader_entry() -> ! {
-    bsp::init();
+    target_board::early_init();
 
-    println!("In bootloader_entry!");
+    if target_board::get_console().lock().borrow().is_none() {
+        panic!("Early Initialization failed to populate console!");
+    }
 
+    println!("-------------------------------------------------------\n      Bootloader Early Initialization Completed!       \n-------------------------------------------------------");
+
+    page_allocator::PageAllocator::init();
+
+    // println!("Page allocator Initialized!");
+
+    // println!("I have allocated {} pages @ {:X?}",1, page_allocator::PageAllocator::alloc(1));
+
+    let printed_bytes = target_board::get_console().lock().borrow().as_ref().unwrap().chars_written();
     println!(
         "I have printed {} bytes",
-        bsp::critical_section(|_| bsp::CONSOLE
-            .lock()
-            .borrow_mut()
-            .as_mut()
-            .unwrap()
-            .chars_written())
+        printed_bytes
     );
 
     // riscv::register::mie::set_mtimer();
@@ -46,13 +55,11 @@ unsafe fn bootloader_entry() -> ! {
     riscv::interrupt::enable();
 
     loop {
-        let time = riscv::register::time::read64();
+        // let time = riscv::register::time::read();
+        let time = spinlock!(target_board::get_clint()).mtime.read().bits();
 
         if time % 0x1_0000 == 0 {
-            println!(
-                "Tick : {}",
-                time
-            );
+            println!("Tick : {}", time);
         }
     }
 }

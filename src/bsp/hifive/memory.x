@@ -1,3 +1,6 @@
+_max_hart_id = 0;
+_heap_size = 4K;
+
 MEMORY
 {
     MASKROM     (rx) : ORIGIN = 0x00010000, LENGTH = 8K

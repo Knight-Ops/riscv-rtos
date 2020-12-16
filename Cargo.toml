@@ -9,9 +9,9 @@ debug = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["bsp_hifive"]
+default = []
 bsp_hifive = ["hifive1", "e310x-hal", "riscv", "riscv-rt", "nb", "lock_api"]
-bsp_maix_m1w = ["k210-hal", "riscv", "riscv-rt", "lock_api"]
+bsp_maix_m1w = ["k210-hal", "riscv", "riscv-rt", "nb", "lock_api"]
 
 [dependencies]
 hifive1 = {version = "0.9.0", features = ["board-hifive1-revb"], optional = true}

@@ -5,30 +5,32 @@ use hifive1::hal::prelude::*;
 use hifive1::hal::DeviceResources;
 use hifive1::pin;
 
+use e310x_hal::{
+    clock::Clocks,
+    e310x::UART0,
+    gpio::gpio0::{Pin16, Pin17},
+    prelude::*,
+    serial::{Rx, Serial, Tx},
+    time::Bps,
+};
+
 use hifive1::hal::core::clint::Clint;
 
 pub mod console;
 pub mod time;
 
-use crate::{println, mut_spinlock, spinlock, read_spinlock, write_spinlock};
-use crate::sync::{Spinlock, RwSpinlock};
+use crate::{sync::{RwSpinlock, Spinlock}};
+use crate::{mut_spinlock, println, read_spinlock, spinlock, write_spinlock};
+use crate::traits::board::BoardSupportPackage;
 
 // Global Instances
-
 pub static CONSOLE: Spinlock<RefCell<Option<console::SerialWrapper>>> =
     Spinlock::new(RefCell::new(None));
 
-
-pub static CORELOCAL_INTERRUPT: Spinlock<RefCell<Option<Clint>>> = Spinlock::new(RefCell::new(None));
+pub static CORELOCAL_INTERRUPT: Spinlock<RefCell<Option<Clint>>> =
+    Spinlock::new(RefCell::new(None));
 // End Global Instances
 
-// pub fn get_ref<'a, T>(periph: &'a Spinlock<RefCell<Option<T>>>) -> &'a T {
-//     periph.lock().borrow().as_ref().unwrap()
-// }
-
-// pub fn get_mut_ref<'a, T>(periph: &'a Spinlock<RefCell<Option<T>>>) -> &'a mut T {
-//     periph.lock().borrow_mut().as_mut().unwrap()
-// }
 
 #[no_mangle]
 pub fn DefaultHandler() {
@@ -99,13 +101,15 @@ pub fn ExceptionHandler(trap_frame: &mut riscv_rt::TrapFrame) {
                     match mtval {
                         // rdtime a0
                         0xc0102573 => {
-                            trap_frame.a0 = spinlock!(CORELOCAL_INTERRUPT).mtime.mtime_lo() as usize;
+                            trap_frame.a0 =
+                                spinlock!(CORELOCAL_INTERRUPT).mtime.mtime_lo() as usize;
                             riscv::register::mepc::write(riscv::register::mepc::read() + 4);
                             return;
-                        },
+                        }
                         // rdtimeh a0
                         0xc8102573 => {
-                            trap_frame.a0 = spinlock!(CORELOCAL_INTERRUPT).mtime.mtime_hi() as usize;
+                            trap_frame.a0 =
+                                spinlock!(CORELOCAL_INTERRUPT).mtime.mtime_hi() as usize;
                             riscv::register::mepc::write(riscv::register::mepc::read() + 4);
                             return;
                         }
@@ -159,37 +163,46 @@ pub fn ExceptionHandler(trap_frame: &mut riscv_rt::TrapFrame) {
     }
 }
 
-pub fn init() {
-    let dr = DeviceResources::take().unwrap();
-    let cp = dr.core_peripherals;
-    let p = dr.peripherals;
-    let pins = dr.pins;
+pub struct Hifive1RevB;
 
-    // Configure clocks
-    let clocks = hifive1::clock::configure(p.PRCI, p.AONCLK, 320.mhz().into());
-
-    // Populate the CLINT Peripheral behind the Mutex
-    CORELOCAL_INTERRUPT.lock().borrow_mut().replace(cp.clint);
-
-    // Configure UART for stdout
-    console::configure(
-        p.UART0,
-        pin!(pins, uart0_tx),
-        pin!(pins, uart0_rx),
-        115_200.bps(),
-        clocks,
-    );
-
-    // mut_spinlock!(CORELOCAL_INTERRUPT).mtimecmp.set_mtimecmp(0xA_0000);
-
-    println!("BSP init @ : {}", riscv::register::time::read64());
-    println!("BSP init @ : {}", riscv::register::mcycle::read());
-    println!("BSP init @ : {}", riscv::register::minstret::read());
+impl Hifive1RevB {
+    pub fn get_clint() -> &'static Spinlock<RefCell<Option<Clint>>> {
+        &CORELOCAL_INTERRUPT
+    }
 }
 
-pub fn critical_section<F, R>(f: F) -> R
-where
-    F: FnOnce(&riscv::interrupt::CriticalSection) -> R,
-{
-    riscv::interrupt::free(|cs| f(cs))
+impl BoardSupportPackage for Hifive1RevB {
+    fn early_init(){
+        let dr = DeviceResources::take().unwrap();
+        let cp = dr.core_peripherals;
+        let p = dr.peripherals;
+        let pins = dr.pins;
+    
+        // Configure clocks
+        let clocks = hifive1::clock::configure(p.PRCI, p.AONCLK, 320.mhz().into());
+    
+        // Populate the CLINT Peripheral behind the Mutex
+        CORELOCAL_INTERRUPT.lock().borrow_mut().replace(cp.clint);
+
+        // Configure UART for stdout
+        console::configure(
+            p.UART0,
+            pin!(pins, uart0_tx),
+            pin!(pins, uart0_rx),
+            115_200.bps(),
+            clocks,
+        );
+    
+    }
+
+    type ConsoleType = console::SerialWrapper;
+    fn get_console() -> &'static Spinlock<RefCell<Option<Self::ConsoleType>>> {
+        &CONSOLE
+    }
+
+    type CriticalSectionType = riscv::interrupt::CriticalSection;
+    fn critical_section<F, R>(f: F) -> R
+    where F: FnOnce(&Self::CriticalSectionType) -> R {
+        riscv::interrupt::free(|cs| f(cs))
+    }
 }

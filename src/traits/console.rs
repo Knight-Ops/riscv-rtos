@@ -29,16 +29,17 @@ pub mod interface {
     /// Console statistics.
     pub trait Statistics {
         /// Return the number of characters written.
-        fn chars_written(&mut self) -> usize {
+        fn chars_written(&self) -> usize {
             0
         }
 
         /// Return the number of characters read.
-        fn chars_read(&mut self) -> usize {
+        fn chars_read(&self) -> usize {
             0
         }
     }
 
     /// Trait alias for a full-fledged console.
     pub trait All = Write + Read + Statistics;
+
 }

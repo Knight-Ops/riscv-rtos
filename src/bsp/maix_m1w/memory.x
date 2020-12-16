@@ -1,4 +1,5 @@
 _max_hart_id = 1;
+_heap_size = 2M;
 
 MEMORY
 {
